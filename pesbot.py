@@ -1588,7 +1588,7 @@ def adb_root(serial, timeout=20):
 def capture_screen(device_serial: str, max_retries: int = 5):
     '''จับภาพหน้าจอจาก emulator ผ่าน adb แล้วเซฟเป็นไฟล์ พร้อม retry สำหรับภาพเสีย'''
     # สร้างชื่อไฟล์ปลอดภัย
-    clean_serial = device_serial.strip().split(':')[1]
+    clean_serial = device_serial.replace(':', '_').replace('.', '_')
     filename = f'screen_{clean_serial}.jpg'
 
     screens_dir = resource_path('screens', readonly=False)
@@ -2671,7 +2671,7 @@ def launch_main_loop(serial, ui_queue: Queue, shared_data, shared_lock):
                             random_target='carector' , 
                             dictionary = None,
                             target_file ='',
-                            save_roi=True,
+                            save_roi=False,
                             is_ignore_x=True
                         )
 
@@ -3687,9 +3687,18 @@ def launch_main_loop(serial, ui_queue: Queue, shared_data, shared_lock):
                         extract_mode = 'name',
                         is_loop=False
                     ),
-                    time.sleep(1.5),
+                    wait_for(
+                        serial=serial,
+                        detection_type='text',
+                        target_file='retry', 
+                        text_action=lambda:[tap_location(serial, 643, 364)], 
+                        text_crop_area=(568, 324, 643, 364),
+                        extract_mode = 'name',
+                        is_loop=False
+                    ),
+                    time.sleep(1),
                     tap_location(serial, 464, 500), # กด Receive All
-                    time.sleep(2),
+                    time.sleep(1),
                     tap_location(serial, 480, 400), # กด OK รับของขวัญ 1
                     time.sleep(1),
                     tap_location(serial, 480, 400), # กด OK รับของขวัญ 2
@@ -3699,7 +3708,7 @@ def launch_main_loop(serial, ui_queue: Queue, shared_data, shared_lock):
                     tap_location(serial, 480, 400), # กด OK รับของขวัญ 4
                     time.sleep(1),
                     tap_location(serial, 480, 400), # กด OK รับของขวัญ 5
-                    time.sleep(2),
+                    time.sleep(1),
                     tap_location(serial, 118, 507) # ปุ่ม Back
                 ],
                 text_crop_area=(420, 492, 540, 525), # พื้นที่คำว่า Receive All
@@ -4148,8 +4157,8 @@ def launch_main_loop(serial, ui_queue: Queue, shared_data, shared_lock):
                     if is_break_loop_skip:
                         break
 
-                    tap_location(serial, 600, 347)
-                    tap_location(serial, 600, 368)
+                    tap_location(serial, 615, 347)
+                    tap_location(serial, 615, 368)
 
                     wait_for(
                         serial=serial,
@@ -4313,7 +4322,7 @@ def launch_main_loop(serial, ui_queue: Queue, shared_data, shared_lock):
             random_target=random_target , 
             dictionary = sorted_files,
             target_file ='',
-            save_roi=True
+            save_roi=False
         )
 
         ranger_name = tesseract_result['best_text']
@@ -4694,17 +4703,7 @@ def launch_main_loop(serial, ui_queue: Queue, shared_data, shared_lock):
                 if is_break:
                     break
 
-                wait_for(
-                    serial=serial,
-                    detection_type='text',
-                    target_file='goog', # Google
-                    text_action=lambda:[
-                        tap_location(serial, 38, 423),
-                    ],
-                    text_crop_area=(455, 125, 562, 170), # พื้นที่คำว่า Google
-                    extract_mode = 'name',
-                    is_loop=False
-                )
+                tap_location(serial, 38, 423)
 
         ui_queue.put(('substage', serial, 'ดอง 1 : หน้าหลัก'))
         pre_main_stage()
@@ -4920,8 +4919,8 @@ def launch_main_loop(serial, ui_queue: Queue, shared_data, shared_lock):
                     if is_break_loop_skip:
                         break
 
-                    tap_location(serial, 600, 347)
-                    tap_location(serial, 600, 368)
+                    tap_location(serial, 615, 347)
+                    tap_location(serial, 615, 368)
 
                     wait_for(
                         serial=serial,
@@ -5028,7 +5027,7 @@ def launch_main_loop(serial, ui_queue: Queue, shared_data, shared_lock):
                             random_target='carector' , 
                             dictionary = None,
                             target_file ='',
-                            save_roi=True,
+                            save_roi=False,
                             is_ignore_x=True
                         )
 
@@ -5130,7 +5129,7 @@ def launch_main_loop(serial, ui_queue: Queue, shared_data, shared_lock):
                             random_target='carector' , 
                             dictionary = None,
                             target_file ='',
-                            save_roi=True,
+                            save_roi=False,
                             is_ignore_x=True
                         )
 
