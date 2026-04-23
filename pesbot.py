@@ -838,7 +838,7 @@ def load_main_config():
     if 'port_list' in main_configs and main_configs['port_list']:
         old_format = any(isinstance(p, int) and p > 255 for p in main_configs['port_list'])
         if old_format:
-            print("[INFO] Detected old port format in config. Resetting port_list to empty. Please configure new 192.168.1.X:5555 addresses using numbers 1-255.")
+            print("[INFO] Detected old port format in config. Resetting port_list to empty. Please configure new 10.0.0.X:5555 addresses using numbers 1-510.")
             main_configs['port_list'] = []
 
     
@@ -958,7 +958,13 @@ def get_current_stage(serial):
 
 
 def normalize_adb_tcpip_address(value):
-    """Normalize user-configured ADB TCP/IP addresses to full 192.168.1.X:5555 form."""
+    """Normalize user-configured ADB TCP/IP addresses to full 10.0.0.X:5555 or 10.0.1.X:5555 form.
+    
+    Input format:
+    - 1-255: 10.0.0.{num}:5555
+    - 256-510: 10.0.1.{num-255}:5555
+    - Full IP address: 10.0.0.X:5555 or 10.0.1.X:5555
+    """
     if value is None:
         return None
     token = str(value).strip()
@@ -977,7 +983,12 @@ def normalize_adb_tcpip_address(value):
     if token.isdigit():
         num = int(token)
         if 1 <= num <= 255:
-            return f'192.168.1.{num}:5555'
+            # 1-255 -> 10.0.0.1 to 10.0.0.255
+            return f'10.0.0.{num}:5555'
+        elif 256 <= num <= 510:
+            # 256-510 -> 10.0.1.1 to 10.0.1.255
+            octet = num - 255
+            return f'10.0.1.{octet}:5555'
         elif num >= 16384:  # old MuMu port format
             # Map old ports starting from 16416 -> 34, increment by 32
             base_old = 16416
@@ -986,7 +997,7 @@ def normalize_adb_tcpip_address(value):
             if (num - base_old) % step == 0:
                 mapped_num = base_num + (num - base_old) // step
                 if 1 <= mapped_num <= 255:
-                    return f'192.168.1.{mapped_num}:5555'
+                    return f'10.0.0.{mapped_num}:5555'
 
     return None
 
@@ -994,7 +1005,7 @@ def normalize_adb_tcpip_address(value):
 def find_adb_tcpip_ports() -> list[str]:
     '''
     หา ADB device ที่เชื่อมต่อผ่าน TCP/IP port :5555
-    คืนค่าเป็น list ของ IP:port เช่น ['192.168.1.10:5555', '192.168.1.20:5555']
+    คืนค่าเป็น list ของ IP:port เช่น ['10.0.0.10:5555', '10.0.1.10:5555']
     '''
     try:
         result = adb_run(
@@ -1039,15 +1050,18 @@ def refresh_connected_ports_label():
     global connected_ports
     connected_ports = get_preconnected_ports()
     if connected_ports:
-        # Extract only the last octet of each IP (e.g., 192.168.1.34:5555 -> 34)
+        # Extract only the last two octets of each IP (e.g., 10.0.0.34:5555 -> 0_34, 10.0.1.34:5555 -> 1_34)
         short_ports = []
         for port_addr in connected_ports:
             if ':' in port_addr:
-                ip_part = port_addr.split(':')[0]  # 192.168.1.34
-                last_octet = ip_part.split('.')[-1]  # 34
+                ip_part = port_addr.split(':')[0]  # 10.0.0.34 or 10.0.1.34
+                octets = ip_part.split('.')
+                if len(octets) >= 4:
+                    y = octets[2]  # 3rd octet (0 or 1)
+                    x = octets[3]  # 4th octet (1-255)
+                    short_ports.append(f'{y}_{x}')
             else:
-                last_octet = port_addr
-            short_ports.append(last_octet)
+                short_ports.append(port_addr)
         
         render_ports.configure(text='Connected: ' +
                                ' | '.join(short_ports), text_color='white')
@@ -2222,8 +2236,12 @@ def extract_text_tesseract(
             
             if save_roi:
                 try:
-                    # แยก serial ให้สะอาด (แทนที่ : ด้วย _)
-                    clean_serial = serial.replace(':', '_').replace('192.168.1.', '').replace('_5555', '')
+                    # แยก serial ให้สะอาด (ดึง octet ที่ 3 และ 4)
+                    octets = serial.split(':')[0].split('.')
+                    if len(octets) >= 4:
+                        clean_serial = f"{octets[2]}_{octets[3]}"
+                    else:
+                        clean_serial = serial.replace(':', '_').replace('10.0.0.', '').replace('10.0.1.', '').replace('_5555', '')
                     timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:-3]  # ลบ microseconds เหลือ milliseconds
                     filename = f'{clean_serial}_{timestamp}_{extract_mode}_{process_multiline_text(clean_text, random_target)}.jpg'
                     roi_debug_dir = resource_path('roi_debug', readonly=False)
@@ -2328,8 +2346,12 @@ def extract_text_tesseract(
 
             if save_roi:
                 try:
-                    # แยก serial ให้สะอาด (แทนที่ : ด้วย _)
-                    clean_serial = serial.replace(':', '_').replace('192.168.1.', '').replace('_5555', '')
+                    # แยก serial ให้สะอาด (ดึง octet ที่ 3 และ 4)
+                    octets = serial.split(':')[0].split('.')
+                    if len(octets) >= 4:
+                        clean_serial = f"{octets[2]}_{octets[3]}"
+                    else:
+                        clean_serial = serial.replace(':', '_').replace('10.0.0.', '').replace('10.0.1.', '').replace('_5555', '')
                     timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:-3]  # ลบ microseconds เหลือ milliseconds
                     filename = f'{clean_serial}_{timestamp}_{extract_mode}_{clean_text}.jpg'
                     roi_debug_dir = resource_path('roi_debug', readonly=False)
@@ -5282,10 +5304,14 @@ def poll_queues(app):
                         lbl = device_labels.get(s)
                         if lbl and lbl.winfo_exists():
                             try:
-                                # Extract only the IP's last octet (e.g., 192.168.1.34:5555 -> 34)
+                                # Extract only the last two octets (e.g., 10.0.0.34:5555 -> 0_34, 10.0.1.34:5555 -> 1_34)
                                 if ':' in s:
-                                    ip_part = s.split(':')[0]  # 192.168.1.34
-                                    port_num = ip_part.split('.')[-1]  # 34
+                                    ip_part = s.split(':')[0]  # 10.0.0.34
+                                    octets = ip_part.split('.')
+                                    if len(octets) >= 4:
+                                        port_num = f"{octets[2]}_{octets[3]}"
+                                    else:
+                                        port_num = s
                                 else:
                                     port_num = s
                                 
@@ -5306,10 +5332,14 @@ def poll_queues(app):
                         #print(f'{s} : COMPLETED')
                         lbl_device = device_labels.get(s)
                         if lbl_device and lbl_device.winfo_exists():
-                            # Extract only the IP's last octet
+                            # Extract only the last two octets
                             if ':' in s:
-                                ip_part = s.split(':')[0]  # 192.168.1.34
-                                port_num = ip_part.split('.')[-1]  # 34
+                                ip_part = s.split(':')[0]  # 10.0.0.34
+                                octets = ip_part.split('.')
+                                if len(octets) >= 4:
+                                    port_num = f"{octets[2]}_{octets[3]}"
+                                else:
+                                    port_num = s
                             else:
                                 port_num = s
                             lbl_device.configure(text=f'{port_num}', text_color='white')
