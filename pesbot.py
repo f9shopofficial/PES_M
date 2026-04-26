@@ -3817,7 +3817,8 @@ def launch_main_loop(serial, ui_queue: Queue, shared_data, shared_lock):
         )
         time.sleep(1.5)
 
-        count_gacha = int(main_configs.get('count_gacha', 3))
+        gacha_slot_list = main_configs.get('gacha_slot_list', []) if main_configs.get('gacha_slot_list') else None
+        count_gacha = len(gacha_slot_list) if gacha_slot_list else int(main_configs.get('count_gacha', 3))
 
         is_free = False
 
@@ -3825,11 +3826,14 @@ def launch_main_loop(serial, ui_queue: Queue, shared_data, shared_lock):
             logger.info(f"{num_name} - random_main: round {i}/{count_gacha} START")  # ← เพิ่ม
             ui_queue.put(('substage', serial, f'ดอง 3 : กาชา รอบที่ {i}'))
 
+            current_slot = gacha_slot_list[i-1] if gacha_slot_list and i-1 < len(gacha_slot_list) else None
+            prev_slot = gacha_slot_list[i-2] if gacha_slot_list and i-2 < len(gacha_slot_list) else 0
             mode = 'main' if count_gacha == 1 else 'multi'
-            index = i
+            mode = 'select' if current_slot else mode
+            index = current_slot if mode == 'select' else i
 
             if not is_free :
-                loop_select_gacha_slot(serial, mode=mode, index=index)
+                loop_select_gacha_slot(serial, mode=mode, index=index, is_minus_slot=False, prev_index=prev_slot )
             
             if index == 2 and is_free :
                 is_free = False
@@ -4068,7 +4072,7 @@ def launch_main_loop(serial, ui_queue: Queue, shared_data, shared_lock):
         
         return login, 0
     
-    def loop_select_gacha_slot(serial, mode='main', index=0, is_minus_slot=False):
+    def loop_select_gacha_slot(serial, mode='main', index=0, is_minus_slot=False, prev_index=0):
         gacha_slot = 1
         swip_start = (628, 252)
         swip_end = (90, 252)
@@ -4079,10 +4083,12 @@ def launch_main_loop(serial, ui_queue: Queue, shared_data, shared_lock):
             gacha_slot = main_configs.get('select_gacha_slot', 1)
         elif mode == 'multi':
             gacha_slot = min(index, 2)
+        elif mode == 'select':
+            gacha_slot = index - prev_index + 1 if prev_index and index > prev_index else index
 
         if is_minus_slot:
             gacha_slot = gacha_slot - main_configs.get('gacha_slot', 1) + 1
-            
+
         if gacha_slot <= 1:
             return
 
